@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -8,14 +9,24 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/gobuffalo/packr"
 )
 
 // ETH interface represents the connection to the Ethereum node
 type ETH interface {
+  ABI(string) (abi.ABI, error)
+  Call(
+		to common.Address,
+		abi *abi.ABI,
+		sig string,
+		res interface{},
+		args ...interface{},
+	) error
 	SubscribeToLogs(chan<- types.Log, ethereum.FilterQuery) (Subscription, error)
 	TransactionByHash(txHash common.Hash) (*types.Transaction, error)
 	SubscribeToNewHeads(chan<- types.Header) (Subscription, error)
@@ -25,6 +36,7 @@ type eth struct {
 	url     *url.URL
 	rpc     *rpc.Client
 	timeout time.Duration
+  abiBox  *packr.Box
 }
 
 // NewClient will return a connected ETH implementation
@@ -39,6 +51,32 @@ func NewClient(urlStr string) (ETH, error) {
 		url: u,
 		rpc: rpc,
 	}, err
+}
+
+// ABI will return the ABI instance for a given filename
+func (c *eth) ABI(filename string) (abi.ABI, error) {
+	b, err := c.abiBox.Find(filename)
+	if err != nil {
+		return abi.ABI{}, err
+	}
+	return abi.JSON(bytes.NewBuffer(b))
+}
+
+func (c *eth) Call(
+	to common.Address,
+	abi *abi.ABI,
+	sig string,
+	res interface{},
+	args ...interface{},
+) error {
+	if data, err := abi.Pack(sig, args...); err != nil {
+		return err
+	} else if resp, err := c.call(to, data); err != nil {
+		return err
+	} else if err := abi.Unpack(res, sig, resp); err != nil {
+		return err
+	}
+	return nil
 }
 
 // TransactionByHash calls `eth_getTransactionByHash` for a given tx hash

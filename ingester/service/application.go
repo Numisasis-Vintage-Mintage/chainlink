@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"chainlink/ingester/client"
@@ -80,7 +81,24 @@ func NewApplication(config *Config) (*Application, error) {
 				copy(topics[index*len(common.Hash{}):], topic.Bytes())
 			}
 
-			logger.Debugw("Oberved new log", "blockHash", log.BlockHash, "index", log.Index, "removed", log.Removed)
+			// logger.Debugw("Oberved new log", "blockHash", log.BlockHash, "index", log.Index, "removed", log.Removed)
+			// logger.Debugw("Oberved new log", "topics", topics)
+
+      if (len(log.Topics) == 3) {
+        logger.Debugw("-------- NewRoundEvent:", "topics byte[]", topics, "log topics", log.Topics, "data", log.Data)
+        nr, _ := UnmarshalNewRoundEvent(log)
+        // if (err) {
+        //   logger.Errorw("could not unmarshal NewRoundEvent", "topics", log.Topics)
+        // }
+        logger.Debugw("-------- NewRoundEvent unmarshaled", "Round ID", nr.RoundID, "Started By", nr.StartedBy)
+      } else if (len(log.Topics) == 4) {
+        // logger.Debugw("******** ResponseReceived:", "topics byte[]", topics, "log topics", log.Topics)
+        // logger.Debugw("******** ResponseReceived")
+      } else {
+        // logger.Debugw("******** Other event:", "len", len(log.Topics), "topics byte[]", topics, "log topics", log.Topics)
+        // logger.Debugw("******** Other event")
+      }
+
 			_, err := db.Exec(`INSERT INTO "ethereum_log" ("address", "topics", "data", "blockNumber", "txHash", "txIndex", "blockHash", "index", "removed") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
 				address,
 				topics,
@@ -147,4 +165,16 @@ func (a *Application) Start(ih InterruptHandler) {
 // Stop will call each services that requires a clean shutdown to stop
 func (a *Application) Stop() {
 	logger.Info("Shutting down")
+}
+
+
+// TODO: put these in the right location
+func UnmarshalNewRoundEvent(log types.Log) (*client.NewRoundEvent, error) {
+	nr := &client.NewRoundEvent{}
+	if len(log.Topics) != 3 {
+		return nr, errors.New("invalid log type while un-marshaling new round, expected 3 topics")
+	}
+	nr.RoundID = log.Topics[1].Big()
+	nr.StartedBy = common.BytesToAddress(log.Topics[2].Bytes())
+	return nr, nil
 }
