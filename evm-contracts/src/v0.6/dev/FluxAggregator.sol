@@ -98,7 +98,7 @@ contract FluxAggregator is AggregatorInterface, Owned {
    * @notice Deploy with the address of the LINK token and initial payment amount
    * @dev Sets the LinkToken address and amount of LINK paid
    * @param _link The address of the LINK token
-   * @param _paymentAmount The amount paid of LINK paid to each oracle per response
+   * @param _paymentAmount The amount paid of LINK paid to each oracle per response, in wei (units of 10⁻¹⁸ LINK)
    * @param _timeout is the number of seconds after the previous round that are
    * allowed to lapse before allowing an oracle to skip an unfinished round
    */
@@ -134,6 +134,21 @@ contract FluxAggregator is AggregatorInterface, Owned {
     deleteRoundDetails(uint32(_round));
   }
 
+  function _addOracle(address _oracle, address _admin) 
+    onlyOwner() onlyUnenabledAddress(_oracle) internal {
+    require(oracleCount() < 42);
+    require(_admin != address(0));
+    require(oracles[_oracle].admin == address(0) || oracles[_oracle].admin == _admin);
+    oracles[_oracle].startingRound = getStartingRound(_oracle);
+    oracles[_oracle].endingRound = ROUND_MAX;
+    oracleAddresses.push(_oracle);
+    oracles[_oracle].index = uint16(oracleAddresses.length.sub(1));
+    oracles[_oracle].admin = _admin;
+
+    emit OracleAdded(_oracle);
+    emit OracleAdminUpdated(_oracle, _admin);
+  }
+
   /**
    * @notice called by the owner to add a new Oracle and update the round
    * related parameters
@@ -153,21 +168,25 @@ contract FluxAggregator is AggregatorInterface, Owned {
     uint32 _restartDelay
   )
     external
-    onlyOwner()
-    onlyUnenabledAddress(_oracle)
   {
-    require(oracleCount() < 42);
-    require(_admin != address(0));
-    require(oracles[_oracle].admin == address(0) || oracles[_oracle].admin == _admin);
-    oracles[_oracle].startingRound = getStartingRound(_oracle);
-    oracles[_oracle].endingRound = ROUND_MAX;
-    oracleAddresses.push(_oracle);
-    oracles[_oracle].index = uint16(oracleAddresses.length.sub(1));
-    oracles[_oracle].admin = _admin;
+    _addOracle(_oracle, _admin);
+    updateFutureRounds(paymentAmount, _minAnswers, _maxAnswers, _restartDelay, timeout);
+  }
 
-    emit OracleAdded(_oracle);
-    emit OracleAdminUpdated(_oracle, _admin);
-
+  /**
+   * @notice Called by the owner to add new oracles and update round params
+   * @param _oracles addresses of the oracles to be added
+   * @param _admins one admin per oracle. admin address accesses oracle's funds
+   * @param _minAnswers minimum number of answers needed to complete a round
+   * @param _maxAnswers round is complete if this many answers are received
+   * @param _restartDelay Min number of rounds allowed between an oracle's calls to initiate a new round
+   */
+  function addOracles(address[] calldata _oracles, address[] calldata _admins,
+    uint32 _minAnswers, uint32 _maxAnswers, uint32 _restartDelay) external
+  {
+    require(_oracles.length == _admins.length,
+            "must be exactly one admin address per oracle");
+    for (uint256 i = 0; i < _admins.length; i++) { _addOracle(_oracles[i], _admins[i]); }
     updateFutureRounds(paymentAmount, _minAnswers, _maxAnswers, _restartDelay, timeout);
   }
 
