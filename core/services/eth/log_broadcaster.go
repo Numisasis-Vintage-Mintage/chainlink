@@ -133,9 +133,11 @@ func (b *logBroadcaster) Unregister(address common.Address, listener LogListener
 // notifies its subscribers.
 func (b *logBroadcaster) startResubscribeLoop() {
 	defer close(b.chDone)
+	var subscription eth.Subscription = noopSubscription{}
+	defer func() { subscription.Unsubscribe() }()
 ResubscribeLoop:
 	for {
-		subscription, chRawLogs, err := b.createSubscription()
+		newSubscription, chRawLogs, err := b.createSubscription()
 		if err != nil {
 			logger.Errorf("error creating subscription to Ethereum node: %v", err)
 
@@ -149,6 +151,8 @@ ResubscribeLoop:
 			}
 		}
 
+		subscription.Unsubscribe()
+		subscription = newSubscription
 		b.notifyConnect()
 
 		shouldResubscribe, err := b.process(subscription, chRawLogs)
@@ -194,8 +198,6 @@ func (b *logBroadcaster) updateLogCursor(blockIdx, logIdx uint64) {
 }
 
 func (b *logBroadcaster) process(subscription eth.Subscription, chRawLogs <-chan eth.Log) (shouldResubscribe bool, _ error) {
-	defer subscription.Unsubscribe()
-
 	// We debounce requests to subscribe and unsubscribe to avoid making too many
 	// RPC calls to the Ethereum node, particularly on startup.
 	var needsResubscribe bool
