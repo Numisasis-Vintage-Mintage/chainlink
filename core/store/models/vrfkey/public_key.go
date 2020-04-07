@@ -88,7 +88,7 @@ func (k *PublicKey) SetFromHex(hex string) error {
 }
 
 // String returns k's binary uncompressed representation, as 0x-hex
-func (k *PublicKey) String() string {
+func (k PublicKey) String() string {
 	return hexutil.Encode(k.comprPoint[:])
 }
 

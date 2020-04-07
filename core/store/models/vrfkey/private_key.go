@@ -120,7 +120,7 @@ func NewPrivateKeyXXXTestingOnly(k *big.Int) *PrivateKey {
 
 // String reduces the risk of accidentally logging the private key
 func (k *PrivateKey) String() string {
-	return fmt.Sprintf("PrivateKey{k: <redacted>, PublicKey: 0x%x}", k.PublicKey)
+	return fmt.Sprintf("PrivateKey{k: <redacted>, PublicKey: %v}", k.PublicKey)
 }
 
 // GoStringer reduces the risk of accidentally logging the private key
