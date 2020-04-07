@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ import (
 	"chainlink/core/gracefulpanic"
 	"chainlink/core/logger"
 	"chainlink/core/services/chainlink"
+	"chainlink/core/store"
 	strpkg "chainlink/core/store"
 	"chainlink/core/store/models"
 	"chainlink/core/store/orm"
@@ -251,10 +253,15 @@ func NewApplicationWithConfig(t testing.TB, tc *TestConfig, flags ...string) (*T
 func NewApplicationWithConfigAndKeyOnSimulatedBlockchain(
 	t testing.TB, tc *TestConfig, backend *backends.SimulatedBackend,
 	flags ...string) (app *TestApplication, cleanup func()) {
-	app, cleanup = NewApplicationWithConfigAndKey(t, tc, flags...)
-	app.EthMock = nil
-	app.Backend = backend
-	return app, func() { cleanup() }
+	app, appCleanup := NewApplicationWithConfigAndKey(t, tc, flags...)
+	var client SimulatedBackendClient
+	if txm, ok := app.Store.TxManager.(*store.EthTxManager); ok {
+		client = SimulatedBackendClient{b: backend}
+		txm.Client = &client
+	} else {
+		log.Panic("SimulatedBackend only works on EthTxManager")
+	}
+	return app, func() { appCleanup(); client.Close() }
 }
 
 func newServer(app chainlink.Application) *httptest.Server {
