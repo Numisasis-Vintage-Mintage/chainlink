@@ -39,17 +39,26 @@ func newPrivateKey(rawKey *big.Int) (*PrivateKey, error) {
 	}
 	sk := &PrivateKey{}
 	sk.k = secp256k1.IntToScalar(rawKey)
-	pk, err := suite.Point().Mul(sk.k, nil).MarshalBinary()
+	rawPublicKey, err := suite.Point().Mul(sk.k, nil).MarshalBinary()
 	if err != nil {
 		panic(errors.Wrapf(err, "could not marshal public key"))
 	}
-	if len(pk) != CompressedPublicKeyLength {
-		panic(fmt.Errorf("public key %x has wrong length", pk))
+	if len(rawPublicKey) != CompressedPublicKeyLength {
+		panic(fmt.Errorf("public key %x has wrong length", rawPublicKey))
 	}
-	if l := copy(sk.PublicKey[:], pk[:]); l != CompressedPublicKeyLength {
-		panic(fmt.Errorf("failed to copy correct length in serialized public key"))
+
+	publicKey, err := NewPublicKeyFromSlice(rawPublicKey)
+	if err != nil {
+		panic(fmt.Sprintf("Unexpected error erturned by NewPublicKeyFromSlice: %v", err))
 	}
+	sk.PublicKey = *publicKey
+
 	return sk, nil
+
+	// if l := copy(sk.PublicKey[:], pk[:]); l != CompressedPublicKeyLength {
+	// 	panic(fmt.Errorf("failed to copy correct length in serialized public key"))
+	// }
+	// return sk, nil
 }
 
 // k.MarshaledProof(seed) is a VRF proof of randomness using k and seed, in the
@@ -77,15 +86,17 @@ func (k *PrivateKey) gethKey() *keystore.Key {
 
 // fromGethKey returns the vrfkey representation of gethKey. Do not abuse this
 // to convert an ethereum key into a VRF key!
-func fromGethKey(gethKey *keystore.Key) *PrivateKey {
+func fromGethKey(gethKey *keystore.Key) (*PrivateKey, error) {
 	secretKey := secp256k1.IntToScalar(gethKey.PrivateKey.D)
 	rawPublicKey, err := secp256k1.ScalarToPublicPoint(secretKey).MarshalBinary()
 	if err != nil {
-		panic(err) // Only way this can happen is out-of-memory failure
+		return nil, err
 	}
-	var publicKey PublicKey
-	copy(publicKey[:], rawPublicKey)
-	return &PrivateKey{secretKey, publicKey}
+	publicKey, err := NewPublicKeyFromSlice(rawPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return &PrivateKey{secretKey, *publicKey}, nil
 }
 
 // CreateKey makes a new VRF proving key from cryptographically secure entropy

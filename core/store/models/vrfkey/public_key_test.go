@@ -16,7 +16,7 @@ func TestValueScanIdentityPointSet(t *testing.T) {
 		var pk, nPk, nnPk PublicKey
 		marshaledKey, err := p.MarshalBinary()
 		require.NoError(t, err, "failed to marshal public key")
-		require.Equal(t, copy(pk[:], marshaledKey),
+		require.Equal(t, copy(pk.comprPoint[:], marshaledKey),
 			CompressedPublicKeyLength, "failed to copy marshaled key to pk")
 		assert.NotEqual(t, pk, nPk, "equality test succeeds on different keys!")
 		np, err := pk.Point()
@@ -32,3 +32,19 @@ func TestValueScanIdentityPointSet(t *testing.T) {
 			"setting one PubliKey to another should result in equal keys")
 	}
 }
+
+func TestHash(t *testing.T) {
+	pk, err := NewPublicKeyFromHex("0x9dc09a0f898f3b5e8047204e7ce7e44b587920932f08431e29c9bf6923b8450a01")
+	assert.NoError(t, err)
+	assert.Equal(t, "0xc4406d555db624837188b91514a5f47e34d825d935ab887a35c06a3e7c41de69", pk.Hash().String())
+}
+
+// func Test_UncompressPublicKey(t *testing.T) {
+// 	pk, err := NewPublicKeyFromHex("0x9dc09a0f898f3b5e8047204e7ce7e44b587920932f08431e29c9bf6923b8450a01")
+// 	assert.NoError(t, err)
+// 	fmt.Println("Hash", pk.Hash().String())
+// 	p := (&secp256k1.Secp256k1{}).Point()
+// 	assert.NoError(t, p.UnmarshalBinary(pk[:]))
+// 	fmt.Printf("uncompressed x: %x\n", secp256k1.LongMarshal(p)[:32])
+// 	fmt.Printf("uncompressed y: %x\n", secp256k1.LongMarshal(p)[32:])
+// }

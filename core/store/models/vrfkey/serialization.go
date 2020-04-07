@@ -91,7 +91,12 @@ func (e *EncryptedSecretKey) Decrypt(auth string) (*PrivateKey, error) {
 		return nil, errors.Wrapf(err, "could not decrypt key %s",
 			e.PublicKey.String())
 	}
-	return fromGethKey(gethKey), nil
+	vrfKey, err := fromGethKey(gethKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not decode key %s",
+			e.PublicKey.String())
+	}
+	return vrfKey, nil
 }
 
 // WriteToDisk writes the JSON representation of e to given file path, and

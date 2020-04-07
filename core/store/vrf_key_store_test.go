@@ -83,7 +83,7 @@ func TestKeyStoreEndToEnd(t *testing.T) {
 		"complaint when attempting to generate VRF proof with unclocked key should be that it's locked")
 	encryptedKey, err := ks.GetSpecificKey(key) // Can export a key to bytes
 	require.NoError(t, err, "should be able to get a specific key")
-	assert.True(t, bytes.Equal(encryptedKey.PublicKey[:], key[:]),
+	assert.True(t, bytes.Equal(encryptedKey.PublicKey.SerializeCompressed(), key.SerializeCompressed()),
 		"should have recovered the encrypted key for the requested public key")
 	verifier := vrfVerifier() // Generated proof is valid
 	_, err = verifier.RandomValueFromVRFProof(nil, proof[:])
